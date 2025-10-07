@@ -1,0 +1,148 @@
+---
+title: "scRNA-seq_Basic_Analysis"
+author: "Sarfaraz Lalani"
+date: "2025-10-07"
+output: html_document
+---
+
+
+```{r}
+# Load the required libraries:
+library(Seurat)
+library(patchwork)
+library(dplyr)
+library(ggplot2)
+
+```
+
+
+
+```{r}
+# Load the PBMC dataset
+pbmc.data <- Read10X(data.dir = "~/Desktop/Projects/scRNA-seq/filtered_gene_bc_matrices/hg19/")
+
+# Initialize the Seurat object with the raw (non-normalized data).
+pbmc <- CreateSeuratObject(counts = pbmc.data, project = "pbmc3k", min.cells = 3, min.features = 200)
+
+
+pbmc
+
+```
+
+
+
+
+```{r}
+# Quality Control (QC)
+# Calculate percent mitochondrial genes
+pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
+
+# Visualize QC metrics before filtering
+VlnPlot(pbmc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+```
+
+
+
+```{r}
+# Filter cells based on QC metrics (remove technical artifacts or empty droplets, doublets or multiplets, and damaged or dying cells)
+pbmc <- subset(pbmc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+
+# Normalize the data
+pbmc <- NormalizeData(pbmc)
+
+
+```
+
+
+```{r}
+
+# Identify highly variable features
+pbmc <- FindVariableFeatures(pbmc)
+
+```
+
+
+
+```{r}
+# Identify the top 10 highly variable genes
+top10 <- head(VariableFeatures(pbmc), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(pbmc)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+```
+
+
+```{r}
+# Scale data (Apply linear transformation/scaling -> Mean expression for each gene across all cells = 0, Mean variance for each gene across all cells = 1)
+# Also, regress out mitochondrial effects
+pbmc <- ScaleData(pbmc, vars.to.regress = "percent.mt")
+
+```
+
+Regressing out percent.mt
+  |======================================================================================================================| 100%
+Centering and scaling data matrix
+  |======================================================================================================================| 100%
+
+
+
+```{r}
+# Perform linear dimensional reduction (Run PCA) on the scaled data
+pbmc <- RunPCA(pbmc)
+
+
+```
+
+
+
+```{r}
+# Determine the dimensionality of the dataset
+ElbowPlot(pbmc)
+
+```
+
+
+```{r}
+
+# Cluster the cells
+pbmc <- FindNeighbors(pbmc, dims = 1:10)
+
+```
+
+
+```{r}
+
+pbmc <- FindClusters(pbmc, resolution = 0.5)
+
+
+```
+
+
+
+```{r}
+
+
+# Run non-linear dimensional reduction (UMAP) for visualization
+pbmc <- RunUMAP(pbmc, dims = 1:10)
+
+```
+
+```{r}
+
+# Plot UMAP with clusters
+DimPlot(pbmc, reduction = "umap", label = TRUE) + ggtitle("UMAP Clusters in PBMC dataset")
+
+
+```
+
+```{r}
+
+# Save Seurat object for sharing
+saveRDS(pbmc, file = "~/Desktop/Projects/scRNA-seq/pbmc3k_cleaned_seurat.rds")
+
+```
+
